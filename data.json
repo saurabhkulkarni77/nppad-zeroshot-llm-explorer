@@ -1,0 +1,372 @@
+{
+ "title": "NPPAD Zero-Shot LLM Explorer",
+ "generated": "2026-11-08",
+ "task": "Frozen LLMs, no fine-tuning and no examples, classify one 60-second window of 12 NPPAD sensor channels (6 samples per channel, given as numbers in a text prompt) into one of 12 accident classes. 48 held-out windows per protocol, strict scoring: anything but exactly one class code counts as wrong.",
+ "protocols": {
+  "t0_100": "Onset-aligned (t0 = 100 s)",
+  "t0_20": "Early (t0 = 20 s, the Task E placement)"
+ },
+ "chance": 0.08333333333333333,
+ "methods": [
+  {
+   "id": "claude_v1",
+   "name": "Claude \u2014 v1 plain prompt",
+   "group": "Prompt arms (Claude)",
+   "status": "complete",
+   "takeaway": "The best of the plain prompts \u2014 and still far below the trained models.",
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.3958333333333333,
+    "macroF1": 0.3916786916786917,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.3333333333333333,
+    "macroF1": 0.2612433862433862,
+    "parseFailures": 0
+   }
+  },
+  {
+   "id": "claude_v2",
+   "name": "Claude \u2014 v2 context prompt",
+   "group": "Prompt arms (Claude)",
+   "status": "complete",
+   "takeaway": "Adding long explanations hurt: on early windows its answers collapsed onto a couple of classes.",
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.3333333333333333,
+    "macroF1": 0.29478715728715726,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.020833333333333332,
+    "macroF1": 0.03333333333333333,
+    "parseFailures": 0
+   }
+  },
+  {
+   "id": "claude_v3",
+   "name": "Claude \u2014 v3 chain-of-thought",
+   "group": "Prompt arms (Claude)",
+   "status": "complete",
+   "takeaway": "Best onset accuracy of the prompt arms, but macro F1 fell \u2014 no clean win for reasoning prompts.",
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.4166666666666667,
+    "macroF1": 0.35000000000000003,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.10416666666666667,
+    "macroF1": 0.051351351351351354,
+    "parseFailures": 0
+   }
+  },
+  {
+   "id": "claude_v4",
+   "name": "Claude \u2014 v4 tree-of-thoughts",
+   "group": "Prompt arms (Claude)",
+   "status": "complete",
+   "takeaway": "No gain over the plain prompt at either protocol.",
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.3333333333333333,
+    "macroF1": 0.3095238095238095,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.10416666666666667,
+    "macroF1": 0.051351351351351354,
+    "parseFailures": 0
+   }
+  },
+  {
+   "id": "llama",
+   "name": "Llama 3.2 3B Instruct (local)",
+   "group": "Local model",
+   "status": "complete",
+   "takeaway": "Answered the same single class for every window at both protocols \u2014 exactly chance level.",
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.08333333333333333,
+    "macroF1": 0.012820512820512822,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.08333333333333333,
+    "macroF1": 0.012820512820512822,
+    "parseFailures": 0
+   }
+  },
+  {
+   "id": "gemini",
+   "name": "Gemini 3 Flash (gemini-3-flash-preview)",
+   "group": "API models",
+   "status": "partial",
+   "statusNote": "Partial run: 57 of 96 windows answered before the free-tier quota stopped the run. The t0=100 protocol is complete (48/48); only 9 of 48 t0=20 windows were answered, so no t0=20 score is claimed.",
+   "takeaway": "Partial run. Its completed onset score sits below Claude\u2019s plain prompt; the early protocol was never finished.",
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.2708333333333333,
+    "macroF1": 0.18095238095238098,
+    "parseFailures": 5
+   },
+   "t0_20": null
+  },
+  {
+   "id": "chatgpt",
+   "name": "ChatGPT (gpt-5.2)",
+   "group": "API models",
+   "status": "not_run",
+   "statusNote": "Not run: the key authenticates, but the OpenAI account has no API credits remaining. Every chat completion call returned HTTP 429 (no credits), so no ChatGPT answers could be collected.",
+   "takeaway": "Not run \u2014 the API account had no credits, so no answers exist and no number is estimated.",
+   "t0_100": null,
+   "t0_20": null
+  },
+  {
+   "id": "feta",
+   "name": "FETA-style DTW few-shot (3 exemplars)",
+   "group": "Literature arms (Claude)",
+   "status": "complete",
+   "takeaway": "The one genuine LLM-side gain: retrieved labeled examples nearly doubled onset accuracy. Still far below the trained models, and it fails on early windows.",
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.7708333333333334,
+    "macroF1": 0.7376283846872083,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.2708333333333333,
+    "macroF1": 0.1893162393162393,
+    "parseFailures": 0
+   }
+  },
+  {
+   "id": "plugin",
+   "name": "ReasonTSC-style plug-in",
+   "group": "Literature arms (Claude)",
+   "status": "complete",
+   "takeaway": "Perfect at onset only because the LLM repeated the trained model\u2019s top answer on all 48 windows. The LLM added nothing in either direction.",
+   "t0_100": {
+    "n": 48,
+    "accuracy": 1.0,
+    "macroF1": 1.0,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.2708333333333333,
+    "macroF1": 0.1893162393162393,
+    "parseFailures": 0
+   }
+  },
+  {
+   "id": "reasontsc",
+   "name": "ReasonTSC \u2014 full replication",
+   "group": "Literature arms (Claude)",
+   "status": "complete",
+   "takeaway": "The paper\u2019s correction claim did not reproduce: across 96 windows the reasoning rounds made 0 corrections and 1 breakage \u2014 one decision changed, for the worse.",
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.9791666666666666,
+    "macroF1": 0.978835978835979,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.2708333333333333,
+    "macroF1": 0.1893162393162393,
+    "parseFailures": 0
+   }
+  },
+  {
+   "id": "stats",
+   "name": "Health-LLM-style statistical summary",
+   "group": "Literature arms (Claude)",
+   "status": "complete",
+   "takeaway": "A small onset accuracy bump over the plain prompt but slightly lower F1, and it collapsed on early windows.",
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.4583333333333333,
+    "macroF1": 0.38416179337231965,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.1875,
+    "macroF1": 0.10439276485788113,
+    "parseFailures": 0
+   }
+  },
+  {
+   "id": "llmtime",
+   "name": "LLMTime-style serialization",
+   "group": "Literature arms (Claude)",
+   "status": "complete",
+   "takeaway": "The worst arm, near chance at both protocols: its per-window rescaling deletes the absolute magnitudes that carry the signal in this data.",
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.14583333333333334,
+    "macroF1": 0.10416666666666667,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.14583333333333334,
+    "macroF1": 0.07254901960784314,
+    "parseFailures": 0
+   }
+  },
+  {
+   "id": "moment",
+   "name": "MOMENT-1 frozen-embedding probe",
+   "group": "Embedding probe",
+   "status": "complete",
+   "takeaway": "A trained logistic probe on frozen time-series embeddings \u2014 level with FETA at onset. Strong, but it is a trained probe, not a zero-shot LLM result.",
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.75,
+    "macroF1": 0.7138188608776844,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.2708333333333333,
+    "macroF1": 0.1893162393162393,
+    "parseFailures": 0
+   }
+  },
+  {
+   "id": "randshot",
+   "name": "Random few-shot control (3 exemplars)",
+   "group": "Flagged arms \u2014 clean re-run values",
+   "status": "flagged",
+   "statusNote": "Original run NOT trustworthy: two blinded agents returned answers matching the true labels on all 12 suspect windows (P100_W37\u2013W48), consistent with reading the label file instead of classifying blind. Values shown are the corrected closed-protocol clean re-run.",
+   "takeaway": "Shown only as the corrected clean re-run. The original headline score must not be cited.",
+   "sensitivity": {
+    "label": "Original run, excluding the 12 suspect windows (n=36), t0=100",
+    "accuracy": 0.667,
+    "macroF1": 0.518
+   },
+   "superseded": {
+    "label": "Original (compromised) run \u2014 do not cite",
+    "t0_100": {
+     "n": 48,
+     "accuracy": 0.75,
+     "macroF1": 0.7360028860028861,
+     "parseFailures": 0,
+     "perClassRecall": {
+      "LOCA": 1.0,
+      "LOCAC": 0.5,
+      "SLBIC": 0.75,
+      "SLBOC": 0.5,
+      "SGATR": 1.0,
+      "SGBTR": 0.75,
+      "RW": 0.25,
+      "RI": 1.0,
+      "FLB": 0.25,
+      "MD": 1.0,
+      "LR": 1.0,
+      "LLB": 1.0
+     }
+    },
+    "t0_20": {
+     "n": 48,
+     "accuracy": 0.3125,
+     "macroF1": 0.2817760942760943,
+     "parseFailures": 0
+    }
+   },
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.7083333333333334,
+    "macroF1": 0.6976430976430977,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.3125,
+    "macroF1": 0.2817760942760943,
+    "parseFailures": 0
+   }
+  },
+  {
+   "id": "plot",
+   "name": "Plot-image zero-shot (12-panel plots)",
+   "group": "Flagged arms \u2014 clean re-run values",
+   "status": "flagged",
+   "statusNote": "Original run NOT trustworthy: the same label-leak anomaly on the suspect windows, and its t0=20 answers duplicated the statistics arm\u2019s answers on 48 of 48 windows. Values shown are the corrected closed-protocol clean re-run.",
+   "takeaway": "Shown only as the corrected clean re-run. The original headline score must not be cited.",
+   "sensitivity": {
+    "label": "Original run, excluding the 12 suspect windows (n=36), t0=100",
+    "accuracy": 0.333,
+    "macroF1": 0.25
+   },
+   "superseded": {
+    "label": "Original (compromised) run \u2014 do not cite",
+    "t0_100": {
+     "n": 48,
+     "accuracy": 0.5,
+     "macroF1": 0.4003267973856209,
+     "parseFailures": 0,
+     "perClassRecall": {
+      "LOCA": 1.0,
+      "LOCAC": 0.5,
+      "SLBIC": 0.0,
+      "SLBOC": 0.0,
+      "SGATR": 1.0,
+      "SGBTR": 0.0,
+      "RW": 0.0,
+      "RI": 0.5,
+      "FLB": 0.0,
+      "MD": 1.0,
+      "LR": 1.0,
+      "LLB": 1.0
+     }
+    },
+    "t0_20": {
+     "n": 48,
+     "accuracy": 0.1875,
+     "macroF1": 0.10439276485788113,
+     "parseFailures": 0
+    }
+   },
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.2916666666666667,
+    "macroF1": 0.2338217338217338,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.08333333333333333,
+    "macroF1": 0.020833333333333332,
+    "parseFailures": 0
+   }
+  }
+ ],
+ "trainedReference": {
+  "name": "Trained MultiRocket+HYDRA (reference)",
+  "scope": "full test split (n=240 at t0=100, n=244 at t0=20), reference",
+  "t0_100": {
+   "n": 240,
+   "accuracy": 0.9833333333333333,
+   "macroF1": 0.9837988396553342,
+   "parseFailures": 0
+  },
+  "t0_20": {
+   "n": 244,
+   "accuracy": 0.27459016393442626,
+   "macroF1": 0.1891822936599056,
+   "parseFailures": 0
+  },
+  "takeaway": "The trained reference on the full test split. Every LLM method is compared against this bar \u2014 and at t0=20 even the trained models are weak, because the plant has barely responded inside the window."
+ },
+ "verdict": "Plain zero-shot prompting on NPPAD behaves exactly as the published literature predicts: near chance on a 12-class multivariate task, and prompt engineering alone does not fix it. Retrieval of similar labeled examples (FETA) is a real prompt-level improvement and roughly doubled onset accuracy, but stays far below trained models and fails on early windows. Plugging a trained model into the prompt only \"reaches\" trained-model performance because the LLM defers to it completely."
+}
