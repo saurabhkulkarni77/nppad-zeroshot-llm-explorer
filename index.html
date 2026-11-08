@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NPPAD Zero-Shot LLM Explorer</title>
+<style>
+  :root{
+    --bg:#0d1420; --panel:#16202f; --panel2:#1b2839; --line:#26354a;
+    --text:#e8eef5; --muted:#93a5bb; --accent:#5b9cf5; --accent2:#f5a65b;
+    --good:#43c98a; --warn:#f5c65b; --bad:#f56b6b; --ref:#b58cf5;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    line-height:1.5}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 18px 60px}
+  h1{font-size:30px;margin:0 0 4px}
+  .sub{color:var(--muted);margin:0 0 18px;font-size:15px}
+  .card{background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;padding:18px 20px;margin:16px 0}
+  .card h2{margin:0 0 8px;font-size:19px}
+  .card p{margin:6px 0}
+  .verdict{border-left:4px solid var(--accent)}
+  .ref{border-left:4px solid var(--ref)}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:20px 0 6px}
+  .controls .lbl{color:var(--muted);font-size:13px;text-transform:uppercase;
+    letter-spacing:.06em}
+  button.toggle{background:var(--panel2);color:var(--text);
+    border:1px solid var(--line);border-radius:999px;padding:7px 16px;
+    font-size:14px;cursor:pointer}
+  button.toggle.active{background:var(--accent);border-color:var(--accent);
+    color:#08111d;font-weight:600}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{padding:9px 10px;border-bottom:1px solid var(--line);
+    text-align:left;vertical-align:top}
+  th{color:var(--muted);font-size:12px;text-transform:uppercase;
+    letter-spacing:.05em;cursor:pointer;user-select:none;white-space:nowrap}
+  th:hover{color:var(--text)}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  tr.flagged td{background:rgba(245,198,91,.06)}
+  .badge{display:inline-block;padding:1px 9px;border-radius:999px;
+    font-size:11.5px;font-weight:600;white-space:nowrap}
+  .b-complete{background:rgba(67,201,138,.15);color:var(--good)}
+  .b-partial{background:rgba(245,166,91,.16);color:var(--accent2)}
+  .b-notrun{background:rgba(245,107,107,.14);color:var(--bad)}
+  .b-flagged{background:rgba(245,198,91,.16);color:var(--warn)}
+  .take{color:var(--muted);font-size:13.5px;min-width:230px}
+  .note{color:var(--warn);font-size:13px}
+  .detail{color:var(--muted);font-size:13px}
+  .bar-row{display:grid;grid-template-columns:250px 1fr 118px;gap:12px;
+    align-items:center;padding:5px 0;border-bottom:1px solid rgba(38,53,74,.5)}
+  .bar-row .nm{font-size:13.5px;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis}
+  .track{position:relative;height:16px;background:var(--panel2);
+    border-radius:4px}
+  .fill{position:absolute;top:0;left:0;height:8px;border-radius:4px;
+    background:var(--accent)}
+  .fill.f1{top:8px;background:var(--accent2)}
+  .chance{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--bad);
+    opacity:.8}
+  .bar-row .vals{font-size:12.5px;color:var(--muted);
+    font-variant-numeric:tabular-nums;text-align:right}
+  .legend{font-size:12.5px;color:var(--muted);margin-top:8px}
+  .legend b{font-weight:600}
+  .sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+    margin:0 4px 0 10px;vertical-align:-1px}
+  footer{color:var(--muted);font-size:12.5px;margin-top:26px}
+  @media (max-width:720px){ .bar-row{grid-template-columns:130px 1fr 96px}
+    .take{min-width:0} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>NPPAD Zero-Shot LLM Explorer</h1>
+  <p class="sub">Can a frozen language model diagnose a nuclear plant
+    accident from numbers alone? Every method tried on the same 96
+    windows, scored the same strict way.</p>
+
+  <div class="card">
+    <h2>The task</h2>
+    <p id="task"></p>
+    <p class="detail">Two protocols:
+      <b>onset-aligned (t0 = 100 s)</b> and <b>early (t0 = 20 s)</b> —
+      the Task E placement, where the plant has barely responded.
+      Guessing one of 12 classes at random gives accuracy ≈ 0.083.</p>
+  </div>
+
+  <div class="card verdict">
+    <h2>Bottom line</h2>
+    <p id="verdict"></p>
+  </div>
+
+  <div class="controls">
+    <span class="lbl">Chart protocol</span>
+    <button class="toggle active" id="btn100">t0 = 100 (onset)</button>
+    <button class="toggle" id="btn20">t0 = 20 (early)</button>
+  </div>
+  <div class="card">
+    <h2 id="chartTitle"></h2>
+    <div id="chart"></div>
+    <p class="legend"><span class="sw" style="background:var(--accent)"></span><b>Accuracy</b>
+      <span class="sw" style="background:var(--accent2)"></span><b>Macro F1</b>
+      <span class="sw" style="background:var(--bad)"></span><b>Chance (1/12)</b>
+      — methods with no score at this protocol are listed under the chart.</p>
+    <p class="detail" id="chartMissing"></p>
+  </div>
+
+  <div class="card">
+    <h2>All methods — click a column header to sort</h2>
+    <table id="tbl">
+      <thead><tr>
+        <th data-k="name">Method</th>
+        <th data-k="status">Status</th>
+        <th class="num" data-k="a100">t0=100 acc</th>
+        <th class="num" data-k="f100">t0=100 F1</th>
+        <th class="num" data-k="a20">t0=20 acc</th>
+        <th class="num" data-k="f20">t0=20 F1</th>
+        <th>Takeaway</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="card ref" id="refCard"></div>
+
+  <footer>Scores are computed from the benchmark's stored answer files
+    under its strict single-code scoring (48 windows per protocol unless
+    stated). Trained references are on the full test split, not the
+    48-window sample. Generated 2026-11-08 from the NPPAD LLM benchmark
+    results files.</footer>
+</div>
+
+<script>
+const DATA = {
+ "title": "NPPAD Zero-Shot LLM Explorer",
+ "generated": "2026-11-08",
+ "task": "Frozen LLMs, no fine-tuning and no examples, classify one 60-second window of 12 NPPAD sensor channels (6 samples per channel, given as numbers in a text prompt) into one of 12 accident classes. 48 held-out windows per protocol, strict scoring: anything but exactly one class code counts as wrong.",
+ "protocols": {
+  "t0_100": "Onset-aligned (t0 = 100 s)",
+  "t0_20": "Early (t0 = 20 s, the Task E placement)"
+ },
+ "chance": 0.08333333333333333,
+ "methods": [
+  {
+   "id": "claude_v1",
+   "name": "Claude \u2014 v1 plain prompt",
+   "group": "Prompt arms (Claude)",
+   "status": "complete",
+   "takeaway": "The best of the plain prompts \u2014 and still far below the trained models.",
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.3958333333333333,
+    "macroF1": 0.3916786916786917,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.3333333333333333,
+    "macroF1": 0.2612433862433862,
+    "parseFailures": 0
+   }
+  },
+  {
+   "id": "claude_v2",
+   "name": "Claude \u2014 v2 context prompt",
+   "group": "Prompt arms (Claude)",
+   "status": "complete",
+   "takeaway": "Adding long explanations hurt: on early windows its answers collapsed onto a couple of classes.",
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.3333333333333333,
+    "macroF1": 0.29478715728715726,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.020833333333333332,
+    "macroF1": 0.03333333333333333,
+    "parseFailures": 0
+   }
+  },
+  {
+   "id": "claude_v3",
+   "name": "Claude \u2014 v3 chain-of-thought",
+   "group": "Prompt arms (Claude)",
+   "status": "complete",
+   "takeaway": "Best onset accuracy of the prompt arms, but macro F1 fell \u2014 no clean win for reasoning prompts.",
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.4166666666666667,
+    "macroF1": 0.35000000000000003,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.10416666666666667,
+    "macroF1": 0.051351351351351354,
+    "parseFailures": 0
+   }
+  },
+  {
+   "id": "claude_v4",
+   "name": "Claude \u2014 v4 tree-of-thoughts",
+   "group": "Prompt arms (Claude)",
+   "status": "complete",
+   "takeaway": "No gain over the plain prompt at either protocol.",
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.3333333333333333,
+    "macroF1": 0.3095238095238095,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.10416666666666667,
+    "macroF1": 0.051351351351351354,
+    "parseFailures": 0
+   }
+  },
+  {
+   "id": "llama",
+   "name": "Llama 3.2 3B Instruct (local)",
+   "group": "Local model",
+   "status": "complete",
+   "takeaway": "Answered the same single class for every window at both protocols \u2014 exactly chance level.",
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.08333333333333333,
+    "macroF1": 0.012820512820512822,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.08333333333333333,
+    "macroF1": 0.012820512820512822,
+    "parseFailures": 0
+   }
+  },
+  {
+   "id": "gemini",
+   "name": "Gemini 3 Flash (gemini-3-flash-preview)",
+   "group": "API models",
+   "status": "partial",
+   "statusNote": "Partial run: 57 of 96 windows answered before the free-tier quota stopped the run. The t0=100 protocol is complete (48/48); only 9 of 48 t0=20 windows were answered, so no t0=20 score is claimed.",
+   "takeaway": "Partial run. Its completed onset score sits below Claude\u2019s plain prompt; the early protocol was never finished.",
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.2708333333333333,
+    "macroF1": 0.18095238095238098,
+    "parseFailures": 5
+   },
+   "t0_20": null
+  },
+  {
+   "id": "chatgpt",
+   "name": "ChatGPT (gpt-5.2)",
+   "group": "API models",
+   "status": "not_run",
+   "statusNote": "Not run: the key authenticates, but the OpenAI account has no API credits remaining. Every chat completion call returned HTTP 429 (no credits), so no ChatGPT answers could be collected.",
+   "takeaway": "Not run \u2014 the API account had no credits, so no answers exist and no number is estimated.",
+   "t0_100": null,
+   "t0_20": null
+  },
+  {
+   "id": "feta",
+   "name": "FETA-style DTW few-shot (3 exemplars)",
+   "group": "Literature arms (Claude)",
+   "status": "complete",
+   "takeaway": "The one genuine LLM-side gain: retrieved labeled examples nearly doubled onset accuracy. Still far below the trained models, and it fails on early windows.",
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.7708333333333334,
+    "macroF1": 0.7376283846872083,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.2708333333333333,
+    "macroF1": 0.1893162393162393,
+    "parseFailures": 0
+   }
+  },
+  {
+   "id": "plugin",
+   "name": "ReasonTSC-style plug-in",
+   "group": "Literature arms (Claude)",
+   "status": "complete",
+   "takeaway": "Perfect at onset only because the LLM repeated the trained model\u2019s top answer on all 48 windows. The LLM added nothing in either direction.",
+   "t0_100": {
+    "n": 48,
+    "accuracy": 1.0,
+    "macroF1": 1.0,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.2708333333333333,
+    "macroF1": 0.1893162393162393,
+    "parseFailures": 0
+   }
+  },
+  {
+   "id": "reasontsc",
+   "name": "ReasonTSC \u2014 full replication",
+   "group": "Literature arms (Claude)",
+   "status": "complete",
+   "takeaway": "The paper\u2019s correction claim did not reproduce: across 96 windows the reasoning rounds made 0 corrections and 1 breakage \u2014 one decision changed, for the worse.",
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.9791666666666666,
+    "macroF1": 0.978835978835979,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.2708333333333333,
+    "macroF1": 0.1893162393162393,
+    "parseFailures": 0
+   }
+  },
+  {
+   "id": "stats",
+   "name": "Health-LLM-style statistical summary",
+   "group": "Literature arms (Claude)",
+   "status": "complete",
+   "takeaway": "A small onset accuracy bump over the plain prompt but slightly lower F1, and it collapsed on early windows.",
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.4583333333333333,
+    "macroF1": 0.38416179337231965,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.1875,
+    "macroF1": 0.10439276485788113,
+    "parseFailures": 0
+   }
+  },
+  {
+   "id": "llmtime",
+   "name": "LLMTime-style serialization",
+   "group": "Literature arms (Claude)",
+   "status": "complete",
+   "takeaway": "The worst arm, near chance at both protocols: its per-window rescaling deletes the absolute magnitudes that carry the signal in this data.",
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.14583333333333334,
+    "macroF1": 0.10416666666666667,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.14583333333333334,
+    "macroF1": 0.07254901960784314,
+    "parseFailures": 0
+   }
+  },
+  {
+   "id": "moment",
+   "name": "MOMENT-1 frozen-embedding probe",
+   "group": "Embedding probe",
+   "status": "complete",
+   "takeaway": "A trained logistic probe on frozen time-series embeddings \u2014 level with FETA at onset. Strong, but it is a trained probe, not a zero-shot LLM result.",
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.75,
+    "macroF1": 0.7138188608776844,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.2708333333333333,
+    "macroF1": 0.1893162393162393,
+    "parseFailures": 0
+   }
+  },
+  {
+   "id": "randshot",
+   "name": "Random few-shot control (3 exemplars)",
+   "group": "Flagged arms \u2014 clean re-run values",
+   "status": "flagged",
+   "statusNote": "Original run NOT trustworthy: two blinded agents returned answers matching the true labels on all 12 suspect windows (P100_W37\u2013W48), consistent with reading the label file instead of classifying blind. Values shown are the corrected closed-protocol clean re-run.",
+   "takeaway": "Shown only as the corrected clean re-run. The original headline score must not be cited.",
+   "sensitivity": {
+    "label": "Original run, excluding the 12 suspect windows (n=36), t0=100",
+    "accuracy": 0.667,
+    "macroF1": 0.518
+   },
+   "superseded": {
+    "label": "Original (compromised) run \u2014 do not cite",
+    "t0_100": {
+     "n": 48,
+     "accuracy": 0.75,
+     "macroF1": 0.7360028860028861,
+     "parseFailures": 0,
+     "perClassRecall": {
+      "LOCA": 1.0,
+      "LOCAC": 0.5,
+      "SLBIC": 0.75,
+      "SLBOC": 0.5,
+      "SGATR": 1.0,
+      "SGBTR": 0.75,
+      "RW": 0.25,
+      "RI": 1.0,
+      "FLB": 0.25,
+      "MD": 1.0,
+      "LR": 1.0,
+      "LLB": 1.0
+     }
+    },
+    "t0_20": {
+     "n": 48,
+     "accuracy": 0.3125,
+     "macroF1": 0.2817760942760943,
+     "parseFailures": 0
+    }
+   },
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.7083333333333334,
+    "macroF1": 0.6976430976430977,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.3125,
+    "macroF1": 0.2817760942760943,
+    "parseFailures": 0
+   }
+  },
+  {
+   "id": "plot",
+   "name": "Plot-image zero-shot (12-panel plots)",
+   "group": "Flagged arms \u2014 clean re-run values",
+   "status": "flagged",
+   "statusNote": "Original run NOT trustworthy: the same label-leak anomaly on the suspect windows, and its t0=20 answers duplicated the statistics arm\u2019s answers on 48 of 48 windows. Values shown are the corrected closed-protocol clean re-run.",
+   "takeaway": "Shown only as the corrected clean re-run. The original headline score must not be cited.",
+   "sensitivity": {
+    "label": "Original run, excluding the 12 suspect windows (n=36), t0=100",
+    "accuracy": 0.333,
+    "macroF1": 0.25
+   },
+   "superseded": {
+    "label": "Original (compromised) run \u2014 do not cite",
+    "t0_100": {
+     "n": 48,
+     "accuracy": 0.5,
+     "macroF1": 0.4003267973856209,
+     "parseFailures": 0,
+     "perClassRecall": {
+      "LOCA": 1.0,
+      "LOCAC": 0.5,
+      "SLBIC": 0.0,
+      "SLBOC": 0.0,
+      "SGATR": 1.0,
+      "SGBTR": 0.0,
+      "RW": 0.0,
+      "RI": 0.5,
+      "FLB": 0.0,
+      "MD": 1.0,
+      "LR": 1.0,
+      "LLB": 1.0
+     }
+    },
+    "t0_20": {
+     "n": 48,
+     "accuracy": 0.1875,
+     "macroF1": 0.10439276485788113,
+     "parseFailures": 0
+    }
+   },
+   "t0_100": {
+    "n": 48,
+    "accuracy": 0.2916666666666667,
+    "macroF1": 0.2338217338217338,
+    "parseFailures": 0
+   },
+   "t0_20": {
+    "n": 48,
+    "accuracy": 0.08333333333333333,
+    "macroF1": 0.020833333333333332,
+    "parseFailures": 0
+   }
+  }
+ ],
+ "trainedReference": {
+  "name": "Trained MultiRocket+HYDRA (reference)",
+  "scope": "full test split (n=240 at t0=100, n=244 at t0=20), reference",
+  "t0_100": {
+   "n": 240,
+   "accuracy": 0.9833333333333333,
+   "macroF1": 0.9837988396553342,
+   "parseFailures": 0
+  },
+  "t0_20": {
+   "n": 244,
+   "accuracy": 0.27459016393442626,
+   "macroF1": 0.1891822936599056,
+   "parseFailures": 0
+  },
+  "takeaway": "The trained reference on the full test split. Every LLM method is compared against this bar \u2014 and at t0=20 even the trained models are weak, because the plant has barely responded inside the window."
+ },
+ "verdict": "Plain zero-shot prompting on NPPAD behaves exactly as the published literature predicts: near chance on a 12-class multivariate task, and prompt engineering alone does not fix it. Retrieval of similar labeled examples (FETA) is a real prompt-level improvement and roughly doubled onset accuracy, but stays far below trained models and fails on early windows. Plugging a trained model into the prompt only \"reaches\" trained-model performance because the LLM defers to it completely."
+};
+const $ = s => document.querySelector(s);
+$('#task').textContent = DATA.task;
+$('#verdict').textContent = DATA.verdict;
+
+const fmt = v => (v === null || v === undefined) ? '—' : v.toFixed(3);
+const badge = st => ({
+  complete:'<span class="badge b-complete">complete</span>',
+  partial:'<span class="badge b-partial">partial</span>',
+  not_run:'<span class="badge b-notrun">not run</span>',
+  flagged:'<span class="badge b-flagged">⚠ flagged</span>'}[st]);
+
+function detailHTML(m){
+  let h = '';
+  if (m.statusNote) h += `<div class="note">${m.statusNote}</div>`;
+  if (m.sensitivity) h += `<div class="detail">${m.sensitivity.label}: ` +
+    `accuracy ${fmt(m.sensitivity.accuracy)}, macro F1 ${fmt(m.sensitivity.macroF1)}</div>`;
+  if (m.superseded) h += `<div class="detail">${m.superseded.label}: ` +
+    `t0=100 ${fmt(m.superseded.t0_100.accuracy)} / ${fmt(m.superseded.t0_100.macroF1)}, ` +
+    `t0=20 ${fmt(m.superseded.t0_20.accuracy)} / ${fmt(m.superseded.t0_20.macroF1)} (accuracy / F1)</div>`;
+  return h;
+}
+
+let sortK = 'f100', sortDir = -1;
+function val(m, k){
+  const g = p => m[p] ? m[p].accuracy : -1, h = p => m[p] ? m[p].macroF1 : -1;
+  return {name:m.name, status:m.status, a100:g('t0_100'), f100:h('t0_100'),
+          a20:g('t0_20'), f20:h('t0_20')}[k];
+}
+function renderTable(){
+  const rows = [...DATA.methods].sort((a,b)=>{
+    const x = val(a,sortK), y = val(b,sortK);
+    return (typeof x === 'string' ? x.localeCompare(y) : x-y) * sortDir;
+  });
+  document.querySelector('#tbl tbody').innerHTML = rows.map(m => `
+    <tr class="${m.status==='flagged' ? 'flagged' : ''}">
+      <td><b>${m.name}</b><div class="detail">${m.group}</div>${detailHTML(m)}</td>
+      <td>${badge(m.status)}</td>
+      <td class="num">${m.t0_100 ? fmt(m.t0_100.accuracy) : (m.status==='not_run'?'not run':'incomplete')}</td>
+      <td class="num">${m.t0_100 ? fmt(m.t0_100.macroF1) : '—'}</td>
+      <td class="num">${m.t0_20 ? fmt(m.t0_20.accuracy) : (m.status==='not_run'?'not run':'incomplete')}</td>
+      <td class="num">${m.t0_20 ? fmt(m.t0_20.macroF1) : '—'}</td>
+      <td class="take">${m.takeaway}</td>
+    </tr>`).join('');
+}
+document.querySelectorAll('#tbl th').forEach(th => th.addEventListener('click', ()=>{
+  const k = th.dataset.k;
+  if (sortK === k) sortDir *= -1; else { sortK = k; sortDir = (k==='name'||k==='status') ? 1 : -1; }
+  renderTable();
+}));
+
+let proto = 't0_100';
+function renderChart(){
+  $('#chartTitle').textContent = 'Scores at ' + DATA.protocols[proto];
+  const have = DATA.methods.filter(m => m[proto]);
+  const missing = DATA.methods.filter(m => !m[proto]);
+  have.sort((a,b)=> b[proto].macroF1 - a[proto].macroF1);
+  const all = [...have, {name:DATA.trainedReference.name,
+    [proto]: DATA.trainedReference[proto], _ref:true}];
+  $('#chart').innerHTML = all.map(m => {
+    const e = m[proto];
+    return `<div class="bar-row">
+      <div class="nm" title="${m.name}">${m._ref ? '★ ' : ''}${m.name}</div>
+      <div class="track">
+        <div class="fill" style="width:${(e.accuracy*100).toFixed(1)}%"></div>
+        <div class="fill f1" style="width:${(e.macroF1*100).toFixed(1)}%"></div>
+        <div class="chance" style="left:${(DATA.chance*100).toFixed(1)}%"></div>
+      </div>
+      <div class="vals">${fmt(e.accuracy)} / ${fmt(e.macroF1)}</div>
+    </div>`;
+  }).join('');
+  $('#chartMissing').textContent = missing.length ?
+    'No score at this protocol: ' + missing.map(m =>
+      `${m.name} (${m.status === 'not_run' ? 'not run' : 'incomplete'})`).join('; ') + '.' : '';
+}
+$('#btn100').addEventListener('click', ()=>{ proto='t0_100';
+  $('#btn100').classList.add('active'); $('#btn20').classList.remove('active'); renderChart(); });
+$('#btn20').addEventListener('click', ()=>{ proto='t0_20';
+  $('#btn20').classList.add('active'); $('#btn100').classList.remove('active'); renderChart(); });
+
+const R = DATA.trainedReference;
+$('#refCard').innerHTML = `<h2>★ ${R.name}</h2>
+  <p>Macro F1 <b>${fmt(R.t0_100.macroF1)}</b> at t0=100 and
+  <b>${fmt(R.t0_20.macroF1)}</b> at t0=20 (accuracy ${fmt(R.t0_100.accuracy)} /
+  ${fmt(R.t0_20.accuracy)}), on the ${R.scope}.</p><p>${R.takeaway}</p>`;
+
+renderTable();
+renderChart();
+</script>
+</body>
+</html>
